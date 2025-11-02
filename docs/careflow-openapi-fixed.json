@@ -1,0 +1,280 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CareFlow Demo API",
+    "description": "Calendar, Messaging and Insurance mock endpoints for IBM watsonx Orchestrate demo.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "CareFlow Team",
+      "email": "support@example.com"
+    },
+    "termsOfService": "https://example.com/terms",
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    { "url": "https://careflow-ntg3.onrender.com", "description": "Render (prod)" }
+  ],
+  "tags": [
+    { "name": "Scheduling", "description": "Book, reschedule, cancel visits" },
+    { "name": "Messaging", "description": "Outbound notifications" },
+    { "name": "Insurance", "description": "Eligibility & benefits" },
+    { "name": "System", "description": "Operational endpoints" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "Your CareFlow API key."
+      }
+    },
+    "schemas": {
+      "BookRequest": {
+        "type": "object",
+        "required": ["patient_ref", "start", "end", "provider", "visit_type"],
+        "properties": {
+          "patient_ref": { "type": "string", "title": "Patient Ref", "example": "pat-123" },
+          "start": { "type": "string", "format": "date-time", "title": "Start", "example": "2025-11-03T09:00:00Z" },
+          "end": { "type": "string", "format": "date-time", "title": "End", "example": "2025-11-03T09:30:00Z" },
+          "provider": { "type": "string", "title": "Provider", "example": "dr-nguyen" },
+          "visit_type": { "type": "string", "title": "Visit Type", "example": "screening" }
+        }
+      },
+      "CancelRequest": {
+        "type": "object",
+        "required": ["booking_id"],
+        "properties": {
+          "booking_id": { "type": "string", "title": "Booking Id", "example": "bk_abc123" },
+          "reason": { "anyOf": [ { "type": "string" }, { "type": "null" } ], "title": "Reason", "example": "Patient requested" }
+        }
+      },
+      "RescheduleRequest": {
+        "type": "object",
+        "required": ["booking_id", "new_start", "new_end"],
+        "properties": {
+          "booking_id": { "type": "string", "title": "Booking Id", "example": "bk_abc123" },
+          "new_start": { "type": "string", "format": "date-time", "title": "New Start", "example": "2025-11-03T10:00:00Z" },
+          "new_end": { "type": "string", "format": "date-time", "title": "New End", "example": "2025-11-03T10:30:00Z" }
+        }
+      },
+      "SendMessageRequest": {
+        "type": "object",
+        "required": ["channel", "to"],
+        "properties": {
+          "channel": { "type": "string", "title": "Channel", "example": "email" },
+          "to": { "type": "string", "title": "To", "example": "patient@example.com" },
+          "subject": { "anyOf": [ { "type": "string" }, { "type": "null" } ], "title": "Subject", "example": "Your Appointment" },
+          "template_name": { "anyOf": [ { "type": "string" }, { "type": "null" } ], "title": "Template Name", "example": "booking_confirmation" },
+          "variables": { "anyOf": [ { "type": "object" }, { "type": "null" } ], "title": "Variables", "example": { "name": "Ava", "date": "Nov 3 9:00 AM" } }
+        }
+      },
+      "InsuranceVerifyRequest": {
+        "type": "object",
+        "required": ["payer", "cpt_code"],
+        "properties": {
+          "payer": { "type": "string", "title": "Payer", "example": "BlueCross" },
+          "cpt_code": { "type": "string", "title": "Cpt Code", "example": "99385" },
+          "visit_type": { "anyOf": [ { "type": "string" }, { "type": "null" } ], "title": "Visit Type", "default": "screening" }
+        }
+      },
+      "HTTPValidationError": {
+        "type": "object",
+        "title": "HTTPValidationError",
+        "properties": {
+          "detail": { "type": "array", "title": "Detail", "items": { "$ref": "#/components/schemas/ValidationError" } }
+        }
+      },
+      "ValidationError": {
+        "type": "object",
+        "required": ["loc", "msg", "type"],
+        "properties": {
+          "loc": { "type": "array", "title": "Location", "items": { "anyOf": [ { "type": "string" }, { "type": "integer" } ] } },
+          "msg": { "type": "string", "title": "Message" },
+          "type": { "type": "string", "title": "Error Type" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error", "message"],
+        "properties": {
+          "error": { "type": "string", "example": "unauthorized" },
+          "message": { "type": "string", "example": "Missing or invalid API key." }
+        }
+      }
+    }
+  },
+  "security": [
+    { "ApiKeyAuth": [] }
+  ],
+  "paths": {
+    "/slots": {
+      "get": {
+        "tags": ["Scheduling"],
+        "summary": "List Slots",
+        "description": "Return available appointment slots for a provider/date.",
+        "operationId": "list_slots",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "description": "RFC3339 date or datetime (e.g. 2025-11-03 or 2025-11-03T09:00:00Z)",
+            "schema": { "type": "string", "format": "date-time" }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "description": "Provider identifier",
+            "schema": { "type": "string", "example": "dr-nguyen" }
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "API key (also provided via global security)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "sample": {
+                    "summary": "Sample",
+                    "value": [
+                      {"start":"2025-11-03T09:00:00Z","end":"2025-11-03T09:30:00Z","provider":"dr-nguyen"},
+                      {"start":"2025-11-03T09:30:00Z","end":"2025-11-03T10:00:00Z","provider":"dr-nguyen"}
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "422": { "description": "Validation Error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HTTPValidationError" } } } }
+        }
+      }
+    },
+    "/book": {
+      "post": {
+        "tags": ["Scheduling"],
+        "summary": "Book",
+        "operationId": "book",
+        "parameters": [
+          { "name": "x-api-key", "in": "header", "required": false, "schema": { "type": "string" }, "description": "API key (global security also applies)." }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BookRequest" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": { "application/json": { "examples": { "sample": { "value": { "booking_id": "bk_abc123" } } } } }
+          },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "422": { "description": "Validation Error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HTTPValidationError" } } } }
+        }
+      }
+    },
+    "/reschedule": {
+      "post": {
+        "tags": ["Scheduling"],
+        "summary": "Reschedule",
+        "operationId": "reschedule",
+        "parameters": [
+          { "name": "x-api-key", "in": "header", "required": false, "schema": { "type": "string" }, "description": "API key (global security also applies)." }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RescheduleRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "examples": { "sample": { "value": { "booking_id": "bk_abc123", "status": "rescheduled" } } } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "422": { "description": "Validation Error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HTTPValidationError" } } } }
+        }
+      }
+    },
+    "/cancel": {
+      "post": {
+        "tags": ["Scheduling"],
+        "summary": "Cancel",
+        "operationId": "cancel",
+        "parameters": [
+          { "name": "x-api-key", "in": "header", "required": false, "schema": { "type": "string" }, "description": "API key (global security also applies)." }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CancelRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "examples": { "sample": { "value": { "booking_id": "bk_abc123", "status": "canceled" } } } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "422": { "description": "Validation Error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HTTPValidationError" } } } }
+        }
+      }
+    },
+    "/message/send": {
+      "post": {
+        "tags": ["Messaging"],
+        "summary": "Send Message",
+        "operationId": "send_message",
+        "parameters": [
+          { "name": "x-api-key", "in": "header", "required": false, "schema": { "type": "string" }, "description": "API key (global security also applies)." }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SendMessageRequest" } } }
+        },
+        "responses": {
+          "202": { "description": "Accepted", "content": { "application/json": { "examples": { "sample": { "value": { "message_id": "msg_456", "status": "queued" } } } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "422": { "description": "Validation Error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HTTPValidationError" } } } }
+        }
+      }
+    },
+    "/insurance/verify": {
+      "post": {
+        "tags": ["Insurance"],
+        "summary": "Insurance Verify",
+        "operationId": "insurance_verify",
+        "parameters": [
+          { "name": "x-api-key", "in": "header", "required": false, "schema": { "type": "string" }, "description": "API key (global security also applies)." }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/InsuranceVerifyRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "examples": { "sample": { "value": { "eligible": true, "copay": 25 } } } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "422": { "description": "Validation Error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HTTPValidationError" } } } }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Health",
+        "operationId": "health",
+        "security": [],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "examples": { "sample": { "value": { "status": "ok" } } } } } }
+        }
+      }
+    }
+  }
+}
